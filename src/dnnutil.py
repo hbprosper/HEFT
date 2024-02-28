@@ -1,3 +1,4 @@
+import os, sys
 
 import numpy as np
 
@@ -13,6 +14,8 @@ from sklearn.model_selection import train_test_split
 
 # linearly transform a feature to zero mean and unit variance
 from sklearn.preprocessing import StandardScaler
+
+from glob import glob
 
 device  = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("device: %s" % device)
@@ -64,6 +67,11 @@ def average_quadratic_loss(f, t, x=None):
     # f and t must be of the same shape
     return  torch.mean((f - t)**2)
 
+def average_quadratic_loss_weighted(f, t, x=None):
+    # f and t must be of the same shape
+    w = torch.where(t != 0, 1/torch.abs(t), 1)
+    return  torch.mean(w * (f - t)**2)
+
 def average_cross_entropy_loss(f, t, x=None):
     # f and t must be of the same shape
     loss = torch.where(t > 0.5, torch.log(f), torch.log(1 - f))
@@ -91,6 +99,38 @@ def validate(model, avloss, inputs, targets):
         
 def number_of_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+def backup_file(filename, backup=5):
+    
+    stem, ext = filename.split('.')
+
+    cmd = f'{stem:s}_*.{ext:s}'
+    files = glob(cmd)
+    files.sort()
+
+    if len(files) == 0:
+        number = 0
+    else:
+        number = int(files[-1].split('_')[-1].split('.')[0])
+    
+    if number >= backup:
+        
+        number = backup-1
+
+        # create a FIFO
+        for i in range(1, backup):
+            j = i+1
+            to_file   = f'{stem:s}_%3.3d.{ext:s}' % i
+            from_file = f'{stem:s}_%3.3d.{ext:s}' % j
+            if os.path.exists(from_file):
+                cmd = f'mv {from_file:s} {to_file:s}'
+                os.system(cmd)
+
+    number += 1
+    backupfile = f'{stem:s}_%3.3d.{ext:s}' % number
+    if os.path.exists(filename):
+        cmd = f'cp {filename:s} {backupfile:s}'
+        os.system(cmd)
         
 def train(model, optimizer, dictfile, early_stopping_count,
           avloss, getbatch,
@@ -179,7 +219,7 @@ def train(model, optimizer, dictfile, early_stopping_count,
             # save only if there has been a "significant" change in 
             # the average loss.
             if acc_v < (1 - change)*min_acc_v:
-                min_acc_v = acc_v
+                min_acc_v = acc_v                
                 torch.save(model.state_dict(), dictfile)
                 stopping_count = 0
                 jjsaved = ii
@@ -198,7 +238,7 @@ def train(model, optimizer, dictfile, early_stopping_count,
                 xx.append(xx[-1] + step)
                 saved = ' %9d: %9d/%10.8f/%9d' % \
                 (ii, jjsaved, min_acc_v, stopping_count)
-                print("\r%9d %9.7f %9.7f%s" % \
+                print("\r%9d %9.7f %9.7f%12s" % \
                       (xx[-1], acc_t, acc_v, saved), end='')
                 
             yy_t.append(acc_t)
@@ -236,3 +276,40 @@ def plot_average_loss(traces, ftsize=18, filename='fig_loss.pdf'):
     plt.tight_layout()
     plt.savefig(filename)
     plt.show()
+
+class AveragedModel:
+    
+    def __init__(self, model, scale=0.02, size=25):
+        from glob import glob
+        from numpy import random
+        from copy import deepcopy
+        
+        self.models = []
+        self.models.append(model)
+        state_dict = model.state_dict()
+
+        for ii in range(1, size):
+            
+            # make a deep copy of input model            
+            self.models.append(deepcopy(model))
+            
+            with torch.no_grad():
+                
+                for name, param in self.models[-1].named_parameters():
+                    
+                    if param.requires_grad:
+                        x = state_dict[name]
+                        y = random.normal(x, scale)
+                        param.copy_(torch.Tensor(y))
+
+    def __call__(self, x):
+        self.models[0].eval()
+        y = self.models[0](x)
+        for m in self.models[1:]:
+            y += m(x)
+        y /= len(self.models)
+        return y
+
+    def eval(self):
+        for m in self.models:
+            m.eval()
