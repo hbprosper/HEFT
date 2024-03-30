@@ -69,26 +69,11 @@ import importlib
 # some simple dnn untilities
 import dnnutil as dn
 
-
 # In[2]:
-
-
-# update fonts
-FONTSIZE = 12
-font = {'family' : 'serif',
-        'weight' : 'normal',
-        'size'   : FONTSIZE}
-mp.rc('font', **font)
-
-# set usetex = False if LaTex is not 
-# available on your system or if the 
-# rendering is too slow
-mp.rc('text', usetex=True)
 
 # set a seed to ensure reproducibility
 seed = 42
 rnd  = np.random.RandomState(seed)
-
 
 # ### Load training data
 
@@ -183,9 +168,7 @@ print('test set size:         %6d' % test_data.shape[0])
 
 # In[41]:
 
-
-get_ipython().run_cell_magic('writefile', 'heftnet_direct.py', "import torch\nimport torch.nn as nn\nimport numpy as np\n\nname     = 'heftnet_direct'\nfeatures = ['mhh', 'CTT', 'CGGH', 'CGGHH']\ntarget   = 'target'\nnodes    = 15\nnhidden  = 12\nnoutputs =  1\n\nclass Sin(nn.Module):\n\n    def __init__(self):\n        # initial base class (nn.Module)\n        super().__init__()\n\n    def forward(self, x):\n        return torch.sin(x)\n\nclass ResNet(nn.Module):\n\n    def __init__(self):\n        # initial base class (nn.Module)\n        super().__init__()\n        self.NN = nn.Sequential(nn.Linear(nodes, nodes), nn.ReLU(),\n                                nn.Linear(nodes, nodes), nn.ReLU())    \n    def forward(self, x):\n        return self.NN(x) + x\n\nclass HEFTNet(nn.Module):\n\n    def __init__(self):\n\n        # initial base class (nn.Module)\n        super().__init__()\n\n        cmd = 'self.xsec = nn.Sequential(nn.Linear(len(features), nodes), nn.SiLU(),'\n        \n        for _ in range(nhidden):\n            cmd += 'nn.Linear(nodes, nodes), nn.SiLU(),'\n            \n        cmd += 'nn.Linear(nodes, noutputs))'\n        \n        exec(cmd)\n        \n    # required method: this function computes the sqrt(cross section)\n    def forward(self, x):\n        # x.shape: (N, 4), where N is the batch size\n        return self.xsec(x)\n")
-
+open('heftnet_direct.py').writeline("import torch\nimport torch.nn as nn\nimport numpy as np\n\nname     = 'heftnet_direct'\nfeatures = ['mhh', 'CTT', 'CGGH', 'CGGHH']\ntarget   = 'target'\nnodes    = 15\nnhidden  = 12\nnoutputs =  1\n\nclass Sin(nn.Module):\n\n    def __init__(self):\n        # initial base class (nn.Module)\n        super().__init__()\n\n    def forward(self, x):\n        return torch.sin(x)\n\nclass ResNet(nn.Module):\n\n    def __init__(self):\n        # initial base class (nn.Module)\n        super().__init__()\n        self.NN = nn.Sequential(nn.Linear(nodes, nodes), nn.ReLU(),\n                                nn.Linear(nodes, nodes), nn.ReLU())    \n    def forward(self, x):\n        return self.NN(x) + x\n\nclass HEFTNet(nn.Module):\n\n    def __init__(self):\n\n        # initial base class (nn.Module)\n        super().__init__()\n\n        cmd = 'self.xsec = nn.Sequential(nn.Linear(len(features), nodes), nn.SiLU(),'\n        \n        for _ in range(nhidden):\n            cmd += 'nn.Linear(nodes, nodes), nn.SiLU(),'\n            \n        cmd += 'nn.Linear(nodes, noutputs))'\n        \n        exec(cmd)\n        \n    # required method: this function computes the sqrt(cross section)\n    def forward(self, x):\n        # x.shape: (N, 4), where N is the batch size\n        return self.xsec(x)\n")
 
 # In[42]:
 
